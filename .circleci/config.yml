@@ -38,6 +38,8 @@ jobs:
           name: Send Container to AWS ecr
           environment:
             REPO: 746502636806.dkr.ecr.eu-west-1.amazonaws.com/java-circle-ci-example-tmp-sf
+          docker:
+            - image: circleci/openjdk:8-jdk            
           command: |
             docker build -t $REPO:$CIRCLE_BUILD_NUM .
             docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$CIRCLE_TAG
