@@ -26,7 +26,13 @@ jobs:
       - run:
           name: Test
           command: mvn test
-      # Setup_remote_docker
+      # 
+      - setup_remote_docker
+      - run:
+          name: Setup common environment variables
+          command: |
+            echo 'export ECR_REPOSITORY_NAME="${AWS_RESOURCE_NAME_PREFIX}"' >> $BASH_ENV
+            echo 'export FULL_IMAGE_NAME="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_REPOSITORY_NAME}:latest"' >> $BASH_ENV
       - run:
           name: Install dependencies for AWS
           command: |
@@ -35,14 +41,14 @@ jobs:
             sudo apt-get install python3-pip
             sudo pip3 install --upgrade awscli
       - run:
-          name: Send Container to AWS ecr
+          name: Build image
+          command: |
+            docker build -t $FULL_IMAGE_NAME .
+      - run:
+          name: Push image
           environment:
             REPO: 746502636806.dkr.ecr.eu-west-1.amazonaws.com/java-circle-ci-example-tmp-sf
-          docker:
-            - image: circleci/openjdk:8-jdk            
           command: |
-            docker build -t $REPO:$CIRCLE_BUILD_NUM .
-            docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$CIRCLE_TAG
             eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
             docker push $REPO     
 
