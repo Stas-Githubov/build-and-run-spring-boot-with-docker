@@ -41,14 +41,12 @@ jobs:
             sudo apt-get install python3-pip
             sudo pip3 install --upgrade awscli
       - run:
-          name: Build image
-          command: |
-            docker build -t $FULL_IMAGE_NAME .
-      - run:
-          name: Push image
+          name: Send Container to AWS ecr
           environment:
             REPO: 746502636806.dkr.ecr.eu-west-1.amazonaws.com/java-circle-ci-example-tmp-sf
           command: |
+            docker build -t $REPO:$CIRCLE_BUILD_NUM .
+            docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$CIRCLE_TAG
             eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
             docker push $REPO     
 
