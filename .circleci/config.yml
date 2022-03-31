@@ -52,22 +52,7 @@ jobs:
             docker tag e9ae3c220b23 746502636806.dkr.ecr.eu-west-1.amazonaws.com/java-circle-ci-example-tmp-sf
             docker push 746502636806.dkr.ecr.eu-west-1.amazonaws.com/java-circle-ci-example-tmp-sf
 
-  deploy-cfn:
-    parameters:
-      stack-name:
-        description: Name of the CloudFormation stack
-        type: string
-    executor: aws-cli/default
-    steps:
-      - checkout
-      - aws-cli/setup
-      - run:
-          name: Deploy Cloudformation Template with new Docker image
-          command: |
-            aws cloudformation deploy \
-            --template cfn/02 - dependent.yml \
-            --stack << parameters.stack-name >> \
-            --parameter-overrides ImageTag=${CIRCLE_SHA1}      
+  
 
 workflows:
   # Below is the definition of your workflow.
