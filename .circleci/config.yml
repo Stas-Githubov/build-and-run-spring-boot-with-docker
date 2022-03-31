@@ -50,7 +50,6 @@ jobs:
             docker build -t e9ae3c220b23 .
             docker tag e9ae3c220b23 746502636806.dkr.ecr.eu-west-1.amazonaws.com/java-circle-ci-example-tmp-sf
             docker push 746502636806.dkr.ecr.eu-west-1.amazonaws.com/java-circle-ci-example-tmp-sf
-
 workflows:
   # Below is the definition of your workflow.
   # Inside the workflow, you provide the jobs you want to run, e.g this workflow runs the build-and-test job above.
