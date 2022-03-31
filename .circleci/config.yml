@@ -65,7 +65,7 @@ jobs:
           name: Deploy Cloudformation Template with new Docker image
           command: |
             aws cloudformation deploy \
-            --template cf/02 - dependent.yml \
+            --template-file cf/dependent.yml \
             --stack << parameters.stack-name >> \
             --parameter-overrides ImageTag=${CIRCLE_SHA1}   
 
