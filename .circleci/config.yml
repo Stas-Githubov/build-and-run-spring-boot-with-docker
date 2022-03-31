@@ -78,6 +78,4 @@ workflows:
     jobs:
       - build-and-test
       - deploy-cfn:
-          context:
-            - aws-12345-us-east-2
           stack-name: My-Application
