@@ -6,6 +6,7 @@ version: 2.1
 orbs:
   aws-ecr: circleci/aws-ecr@6.4.0
   aws-ecs: circleci/aws-ecs@0.0.11
+  aws-cli: circleci/aws-cli@1.4.0
 
 jobs:
   # Below is the definition of your job to build and test your app, you can rename and customize it as you want.
@@ -50,6 +51,24 @@ jobs:
             docker build -t e9ae3c220b23 .
             docker tag e9ae3c220b23 746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf
             docker push 746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf
+
+  deploy-cfn:
+    parameters:
+      stack-name:
+        description: Name of the CloudFormation stack
+        type: string
+    executor: aws-cli/default
+    steps:
+      - checkout
+      - aws-cli/setup
+      - run:
+          name: Deploy Cloudformation Template with new Docker image
+          command: |
+            aws cloudformation deploy \
+            --template cf/02 - dependent.yml \
+            --stack << parameters.stack-name >> \
+            --parameter-overrides ImageTag=${CIRCLE_SHA1}   
+
 workflows:
   # Below is the definition of your workflow.
   # Inside the workflow, you provide the jobs you want to run, e.g this workflow runs the build-and-test job above.
@@ -57,4 +76,8 @@ workflows:
   # For more details on extending your workflow, see the configuration docs: https://circleci.com/docs/2.0/configuration-reference/#workflows
   sample: 
     jobs:
-      - build-and-test
+      - build-and-test:
+      - deploy-cfn:
+        context:
+          - aws-12345-us-east-2
+        stack-name: My-Application
