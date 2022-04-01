@@ -29,7 +29,7 @@ Parameters:
   SiteUrl:
     Description: Prefix added to the HostedZoneName - for example, testing
     Type: String
-    Default: ChangeMe!
+    Default: java234
 
   Certificate:
     Type: String
