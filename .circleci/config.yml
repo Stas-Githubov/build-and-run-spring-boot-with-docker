@@ -80,4 +80,6 @@ workflows:
     jobs:
       - build-and-test
       - deploy-cfn:
+          requires:
+            - build-and-test
           stack-name: My-Application
