@@ -66,11 +66,8 @@ jobs:
           command: |
             aws cloudformation update-stack \
             --stack-name << parameters.stack-name >> \
-            --use-previous-template \            
-            --parameters PrivateSubnetA=$CF_PRIVATE_SUBNET_A PrivateSubnetB=$CF_PRIVATE_SUBNET_B VPC=$CF_VPC \
-            PublicSubnetA=$CF_PUBLIC_SUBNET_A PublicSubnetB=$CF_PUBLIC_SUBNET_B KeyName=$CF_KEY_NAME NATSecurityGroup=$CF_NAT_SECURITY_GROUP \
-            --capabilities CAPABILITY_NAMED_IAM   
-
+            --use-previous-template 
+            
 workflows:
   # Below is the definition of your workflow.
   # Inside the workflow, you provide the jobs you want to run, e.g this workflow runs the build-and-test job above.
