@@ -93,7 +93,8 @@ workflows:
 
   staging-release:
     jobs:
-      - build-and-test: *only-tags-for-staging
+      - build-and-test: 
+          <<: *only-tags-for-staging
           type: staging
       - deploy-cfn:
           <<: *only-tags-for-staging
@@ -102,7 +103,8 @@ workflows:
 
   production-release:
     jobs:
-      - build-and-test: *only-tags-for-production
+      - build-and-test:
+          <<: *only-tags-for-production
           type: production
       - deploy-cfn:
           <<: *only-tags-for-production
