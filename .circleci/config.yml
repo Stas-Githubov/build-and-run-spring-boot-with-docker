@@ -91,11 +91,12 @@ jobs:
             --stack-name << parameters.stack-name >> \
             --use-previous-template \ 
             --region eu-west-2 \
-            --parameters ParameterKey=PrivateSubnetA,ParameterValue=subnet-0df97c9e1ff78f496 ParameterKey=PrivateSubnetB, \
-            ParameterValue=subnet-0b7d9f8ea5e76857b  ParameterKey=VPC,ParameterValue=vpc-057b0e6f6460f7fc8 ParameterKey=PublicSubnetB, \
-            ParameterValue=subnet-000d81de648c7a106 ParameterKey=PublicSubnetA,ParameterValue=subnet-04fa2fd01d4134f58 ParameterKey=KeyName, \
-            ParameterValue=Alytic ParameterKey=NATSecurityGroup,ParameterValue=sg-02278542c899ab4a8 ParameterKey=RepoTag,ParameterValue=$CF_REPO_TAG \ 
-            --capabilities CAPABILITY_NAMED_IAM            
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameters ParameterKey=PrivateSubnetA,ParameterValue=subnet-0df97c9e1ff78f496 ParameterKey=PrivateSubnetB,\
+            ParameterValue=subnet-0b7d9f8ea5e76857b  ParameterKey=VPC,ParameterValue=vpc-057b0e6f6460f7fc8 ParameterKey=PublicSubnetB,\
+            ParameterValue=subnet-000d81de648c7a106 ParameterKey=PublicSubnetA,ParameterValue=subnet-04fa2fd01d4134f58 ParameterKey=KeyName,\
+            ParameterValue=Alytic ParameterKey=NATSecurityGroup,ParameterValue=sg-02278542c899ab4a8 ParameterKey=RepoTag,ParameterValue=$CF_REPO_TAG\ 
+                         
 workflows:
   # Below is the definition of your workflow.
   # Inside the workflow, you provide the jobs you want to run, e.g this workflow runs the build-and-test job above.
