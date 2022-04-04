@@ -34,7 +34,9 @@ jobs:
     parameters:
       release_type:
         description: staging or production
-        type: string 
+        type: string
+      RepoTag:
+        type: string
     docker:
       - image: circleci/openjdk:8-jdk
     steps:
