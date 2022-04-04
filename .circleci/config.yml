@@ -89,7 +89,7 @@ jobs:
           command: |
             aws cloudformation update-stack \
             --stack-name << parameters.stack-name >> \
-            --template-body file:cf/my-template.yml
+            --template-body file:cf/my-template.yml \
             --region eu-west-2 \
             --capabilities CAPABILITY_NAMED_IAM \
             --parameters file://cf/parameters/update.json
