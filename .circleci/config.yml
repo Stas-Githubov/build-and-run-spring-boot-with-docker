@@ -64,9 +64,9 @@ jobs:
       - run:
           name: Deploy Cloudformation Template with new Docker image
           command: |
-            aws --region eu-west-2 cloudformation update-stack \
+            aws cloudformation update-stack \
             --stack-name << parameters.stack-name >> \
-            --template-url cf/my-template.yml \            
+            --use-previous-template \            
             --parameters PrivateSubnetA=$CF_PRIVATE_SUBNET_A PrivateSubnetB=$CF_PRIVATE_SUBNET_B VPC=$CF_VPC \
             PublicSubnetA=$CF_PUBLIC_SUBNET_A PublicSubnetB=$CF_PUBLIC_SUBNET_B KeyName=$CF_KEY_NAME NATSecurityGroup=$CF_NAT_SECURITY_GROUP \
             --capabilities CAPABILITY_NAMED_IAM   
