@@ -112,7 +112,7 @@ workflows:
           requires:
               - build-and-test
           stack-name: Alytic-20-Test
-          RepoTag: $CIRCLE_BUILD_NUM
+          RepoTag: ${CIRCLE_BUILD_NUM}
 
   production-release:
     jobs:
@@ -124,4 +124,4 @@ workflows:
           requires:
               - build-and-test
           stack-name: Alytic-20-Test
-          RepoTag: $CIRCLE_BUILD_NUM
+          RepoTag: ${CIRCLE_BUILD_NUM}
