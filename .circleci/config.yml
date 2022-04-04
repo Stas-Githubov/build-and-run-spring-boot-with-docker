@@ -31,6 +31,10 @@ jobs:
     # You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
     # Be sure to update the Docker image tag below to openjdk version of your application.
     # A list of available CircleCI Docker Convenience Images are available here: https://circleci.com/developer/images/image/cimg/openjdk
+    parameters:
+      release_type:
+        description: staging or production
+        type: string 
     docker:
       - image: circleci/openjdk:8-jdk
     steps:
