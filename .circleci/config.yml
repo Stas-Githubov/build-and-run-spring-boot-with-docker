@@ -36,7 +36,7 @@ jobs:
         description: staging or production
         type: string
       RepoTag:
-        type: string
+        type: integer        
     docker:
       - image: circleci/openjdk:8-jdk
     steps:
