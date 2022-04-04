@@ -35,8 +35,6 @@ jobs:
       release_type:
         description: staging or production
         type: string
-      RepoTag:
-        type: integer        
     docker:
       - image: circleci/openjdk:8-jdk
     steps:
@@ -80,6 +78,8 @@ jobs:
       stack-name:
         description: Name of the CloudFormation stack
         type: string
+      RepoTag:
+        type: integer   
     executor: aws-cli/default
     steps:
       - checkout
