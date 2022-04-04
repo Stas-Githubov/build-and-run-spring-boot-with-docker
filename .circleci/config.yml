@@ -46,12 +46,11 @@ jobs:
           name:  Build and push image
           environment:
             REPO: 746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf
-            ENV_TAG: staging
           command: |            
             eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
             docker build -t $REPO:$CIRCLE_BUILD_NUM .
             docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$CIRCLE_TAG
-            docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$ENV_TAG
+            docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:staging
             docker push $REPO
 
   deploy-cfn:
