@@ -66,7 +66,7 @@ jobs:
             eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
             docker build -t $REPO:$CIRCLE_BUILD_NUM .
             #docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$CIRCLE_TAG
-            docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:<< parameters.type >>
+            docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:<< parameters.release_type >>
             docker push $REPO
 
   deploy-cfn:
@@ -95,7 +95,7 @@ workflows:
     jobs:
       - build-and-test: 
           <<: *only-tags-for-staging
-          type: staging
+          release_type: staging
       - deploy-cfn:
           <<: *only-tags-for-staging
           requires:
@@ -105,7 +105,7 @@ workflows:
     jobs:
       - build-and-test:
           <<: *only-tags-for-production
-          type: production
+          release_type: production
       - deploy-cfn:
           <<: *only-tags-for-production
           requires:
