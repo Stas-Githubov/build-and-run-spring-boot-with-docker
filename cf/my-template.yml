@@ -10,6 +10,10 @@ Description: >
 
 Parameters:
 
+  DummyParameter:
+    Description: This parameter actually not using - we need it to start update process on CircleCI
+    Type: String
+
   HostsInPrivate:
     Description: Specify where whould be deployed EC2 hosts - in Private or in Public subnet
     Default: true
