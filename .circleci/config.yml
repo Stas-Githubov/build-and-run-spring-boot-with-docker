@@ -66,7 +66,7 @@ jobs:
           command: |
             aws --region eu-west-2 cloudformation deploy \
             --template-file cf/my-template.yml \
-            --stack "stack-name" \
+            --stack << parameters.stack-name >> \
             --parameter-overrides PrivateSubnetA=subnet-0df97c9e1ff78f496 PrivateSubnetB=subnet-0b7d9f8ea5e76857b VPC=vpc-057b0e6f6460f7fc8 \
             PublicSubnetB=subnet-000d81de648c7a106 PublicSubnetA=subnet-04fa2fd01d4134f58 KeyName=Alytic NATSecurityGroup=sg-02278542c899ab4a8 \
             --capabilities CAPABILITY_NAMED_IAM   
@@ -82,4 +82,4 @@ workflows:
       - deploy-cfn:
           requires:
             - build-and-test
-          stack-name: My-Application
+          stack-name: My-Application-CF
