@@ -49,7 +49,7 @@ jobs:
           command: |
             eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
             docker build -t e9ae3c220b23 .
-            docker tag e9ae3c220b23 746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf
+            #docker tag e9ae3c220b23 746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf
             docker tag $CF_VERSION 746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf
             docker push 746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf
 
