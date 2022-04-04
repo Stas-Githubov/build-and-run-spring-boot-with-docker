@@ -10,8 +10,8 @@ Description: >
 
 Parameters:
 
-  DummyParameter:
-    Description: This parameter actually not using - we need it to start update process on CircleCI
+  RepoTag:
+    Description: Tag will be used to pull a certain Docker image from repo
     Type: String
 
   HostsInPrivate:
@@ -530,7 +530,7 @@ Resources:
           Memory: 512
           MemoryReservation: 512
           #VolumesFrom: []
-          Image: !Sub "${DockerImage}:latest"
+          Image: !Sub "${DockerImage}:${RepoTag}"
           Essential: true
           Hostname: Java-CircleCi
 
