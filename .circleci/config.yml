@@ -1,6 +1,22 @@
 # Use the latest 2.1 version of CircleCI pipeline process engine. 
 # See: https://circleci.com/docs/2.0/configuration-reference
-# Just a comment
+
+# Staging tags
+only-tags-for-staging: &only-tags-for-staging
+  filters:
+    branches:
+        ignore: /.*/
+    tags:
+        only: /^v[0-9]+\.[0-9]+\.[0-9]+\-rc[0-9]+$/
+
+# Production tags
+only-tags-for-production: &only-tags-for-production
+  filters:
+    branches:
+        ignore: /.*/
+    tags:
+        only: /^v[0-9]+\.[0-9]+\.[0-9]+$/
+
 version: 2.1
 
 orbs:
@@ -74,10 +90,19 @@ workflows:
   # Inside the workflow, you provide the jobs you want to run, e.g this workflow runs the build-and-test job above.
   # CircleCI will run this workflow on every commit.
   # For more details on extending your workflow, see the configuration docs: https://circleci.com/docs/2.0/configuration-reference/#workflows
-  sample: 
+
+  staging-release:
     jobs:
-      - build-and-test
+      - build-and-test-staging: *only-tags-for-staging
       - deploy-cfn:
+          <<: *only-tags-for-staging
           requires:
-            - build-and-test
-          stack-name: Alytic-20-Test
+              - build-and-test-staging
+
+  production-release:
+    jobs:
+      - build-and-test-production: *only-tags-for-production
+      - deploy-cfn:
+          <<: *only-tags-for-production
+          requires:
+              - build-and-test-production
