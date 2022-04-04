@@ -69,7 +69,7 @@ jobs:
           command: |            
             eval $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
             docker build -t $REPO:$CIRCLE_BUILD_NUM .
-            #docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$CIRCLE_TAG
+            docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:$CIRCLE_TAG
             docker tag $REPO:$CIRCLE_BUILD_NUM $REPO:<< parameters.release_type >>
             docker push $REPO
 
