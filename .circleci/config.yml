@@ -112,7 +112,7 @@ workflows:
           <<: *only-tags-for-staging
           requires:
               - build-and-test
-          stack-name: Alytic-20-Test
+          stack-name: alytic-20-Stag
           RepoTag: 84
 
   production-release:
@@ -124,5 +124,5 @@ workflows:
           <<: *only-tags-for-production
           requires:
               - build-and-test
-          stack-name: Alytic-20-Test
+          stack-name: alytic-20-Prod
           RepoTag: 84
