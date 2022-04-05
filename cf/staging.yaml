@@ -1,1 +1,548 @@
+Description: >
 
+    Java-CircleCi Lab - Staging
+
+    This template pickup an existing VPC (with at least two public and two private subnets available in the same
+    zones) and deploys a highly available ECS cluster.
+    Note, that the EC2 instances will be running in a private subnet so we can't SSH to it
+    (we need to SSH to an another instanse in the same public subnet and from this instance SSH to an instance
+    in private subnet.
+
+Parameters:
+
+  RepoTag:
+    Description: Tag will be used to pull a certain version of Docker image from repo
+    Type: String
+
+  HostsInPrivate:
+    Description: Specify where whould be deployed EC2 hosts - in Private or in Public subnet
+    Default: true
+    Type: String
+    AllowedValues: [true, false]
+
+  DockerImage:
+    Description: Url to AWS ECS repo (by default - the Docker image was prepared for this lab)
+    Type: String
+    Default: '746502636806.dkr.ecr.eu-west-1.amazonaws.com/stan_temp/java-circle-ci-example-tmp-sf'
+
+  HostedZoneName:
+      Description: The route53 HostedZoneName. For example, "mydomain.com."  Don't forget the period at the end.
+      Type: String
+      Default: alytic.io.
+
+  SiteUrl:
+    Description: Prefix added to the HostedZoneName - for example, testing
+    Type: String
+    Default: java234-production
+
+  Certificate:
+    Type: String
+    Description: SSL certificate ARN. Leave it empty to use default mapped SSL certificate *.alytic.net (now available for London and N. Virginia)
+    Default: ''
+
+  NATSecurityGroup:
+    Description: NAT Gateway (EC2 instance) Security Group
+    Type: AWS::EC2::SecurityGroup::Id
+
+  VPC:
+    Description: Existing VPC
+    Type: AWS::EC2::VPC::Id
+
+  PrivateSubnetA:
+    Description: Existing private VPC Subnet - Zone A
+    Type: AWS::EC2::Subnet::Id
+
+  PrivateSubnetB:
+    Description: Another existing private VPC Subnet - Zone B
+    Type: AWS::EC2::Subnet::Id
+
+  PublicSubnetA:
+    Description: Existing public VPC Subnet - Zone A
+    Type: AWS::EC2::Subnet::Id
+
+  PublicSubnetB:
+    Description: Another existing public VPC Subnet - Zone B
+    Type: AWS::EC2::Subnet::Id
+
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+    - t3.micro
+    - t3.small
+    - t3.medium
+    ConstraintDescription: must be a valid EC2 instance type.
+
+  KeyName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the ECS instances
+
+  TaskMinCount:
+    Description: Minimum number of tasks we run across the service
+    Type: Number
+    Default: 2
+
+  TaskMaxCount:
+    Description: Maximum number of tasks we run across the service
+    Type: Number
+    Default: 2
+
+  Ec2MinCount:
+    Description: Minimum number of EC2 instances we can run across our cluster
+    Type: Number
+    Default: 1
+
+  Ec2MaxCount:
+    Description: Maximum number of EC2 instances we can run across our cluster
+    Type: Number
+    Default: 1
+
+  ECSAMI:
+    Description: ECS-Optimized AMI ID
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+
+Mappings:
+  # "alytic.io" a
+  SSLCertificateMap:
+    eu-west-2:
+      SSLCertificateId: 'arn:aws:acm:eu-west-2:746502636806:certificate/c29a7f8c-11c7-4141-b4d9-b3dda4bb18cf'
+
+Conditions:
+  # Set condition for SSL
+  HasSSL: !Equals [ !Ref Certificate, "" ]
+  # Where hosts (in private or public subnet)
+  IsHostsInPrivate: !Equals [ true, !Ref HostsInPrivate ]
+
+Resources:
+
+  # Security Groups - begin
+
+# Define Security Group and its inbound rules (= ingress).
+# The outbound (egress) rules are automatically set as "Allow All".
+  ECSHostSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Access to the ECS hosts and the tasks/containers that run on them
+      SecurityGroupIngress:
+        # Only allow inbound access to ECS from the ELB
+        - SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+          IpProtocol: -1
+          Description: Enable all traffic from ALB SG
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} - ECS-Hosts-SG
+
+  SecurityGroupIngressSSH:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ECSHostSecurityGroup
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+      CidrIp: 87.242.170.179/32
+      Description: Enable SSH from Russell Square office
+
+  # Enable all traffic from the Hosts Security Group to self
+  SecurityGroupIngressInternal:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ECSHostSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref ECSHostSecurityGroup
+      Description: Enable all from self
+
+  # This security group defines who/where is allowed to access the Application Load Balancer.
+  # By default, we've opened this up to the public internet (0.0.0.0/0) but can you restrict
+  # it further if you want.
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Access to the load balancer that sits in front of ECS
+      SecurityGroupIngress:
+        # Allow access from anywhere to our ECS services
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName} - LoadBalancers-SG
+
+  # Security Groups - end
+
+  # Application Load Balancer - begin
+
+  # This will add Route53 record set
+  myDNS:
+   Type: AWS::Route53::RecordSetGroup
+   Properties:
+     HostedZoneName: !Ref HostedZoneName
+     Comment: Zone apex alias targeted to myELB LoadBalancer.
+     RecordSets:
+       - Name: !Sub '${ESSubdomain}.${HostedZoneName}'
+         Type: A
+         AliasTarget:
+           HostedZoneId: !GetAtt
+             - LoadBalancer
+             - CanonicalHostedZoneID
+           DNSName: !GetAtt
+             - LoadBalancer
+             - DNSName
+
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${AWS::StackName}-ALB
+      Subnets:
+          - !Ref PublicSubnetA
+          - !Ref PublicSubnetB
+      SecurityGroups:
+          - !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-ALB
+
+  LoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn:  !If [HasSSL, { "Fn::FindInMap" : [ "SSLCertificateMap", { "Ref" : "AWS::Region" },
+"SSLCertificateId"]} , !Ref Certificate]
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref DefaultTargetGroup
+
+  DefaultTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${AWS::StackName}-Default-TG
+      VpcId: !Ref VPC
+      Port: 80
+      Protocol: HTTP
+      HealthCheckPath: /api/health-check
+
+  # Application Load Balancer - end
+
+  # ECS cluster - begin
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${AWS::StackName}-ECS-Cluster
+
+  ECSAutoScalingGroup:
+    DependsOn: ECSCluster
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !If [ IsHostsInPrivate, !Ref PrivateSubnetA, !Ref PublicSubnetA ]
+        - !If [ IsHostsInPrivate, !Ref PrivateSubnetB, !Ref PublicSubnetB ]
+      LaunchConfigurationName: !Ref ECSLaunchConfiguration
+      MinSize: !Ref Ec2MinCount
+      MaxSize: !Ref Ec2MaxCount
+      DesiredCapacity: !Ref Ec2MinCount
+      Tags: !Sub ${AWS::StackName}-ECS host
+        - Key: Name
+          PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: 1
+        MaxBatchSize: 1
+        PauseTime: PT15M
+        SuspendProcesses:
+          - HealthCheck
+          - ReplaceUnhealthy
+          - AZRebalance
+          - AlarmNotification
+          - ScheduledActions
+        WaitOnResourceSignals: true
+
+  ECSLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Ref ECSAMI
+      KeyName: !Ref KeyName
+      InstanceType: !Ref InstanceType
+      SecurityGroups:
+        - !Ref NATSecurityGroup
+        - !Ref ECSHostSecurityGroup
+      IamInstanceProfile: !Ref ECSInstanceProfile
+      UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash
+          yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+          yum install -y aws-cfn-bootstrap hibagent
+          /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+          /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
+          /usr/bin/enable-ec2-spot-hibernation
+
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+          files:
+            /etc/cfn/cfn-hup.conf:
+              mode: 000400
+              owner: root
+              group: root
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ECSLaunchConfiguration.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+
+  # This IAM Role is attached to all of the ECS hosts. It is based on the default role
+  # published here:
+  # http://docs.aws.amazon.com/AmazonECS/latest/developerguide/instance_IAM_role.html
+  #
+  # You can add other IAM policy statements here to allow access from your ECS hosts
+  # to other AWS services. Please note that this role will be used by ALL containers
+  # running on the ECS host.
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /
+      RoleName: !Sub ECSRole-${AWS::Region}-${AWS::StackName}
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Action": "sts:AssumeRole",
+                "Effect": "Allow",
+                "Principal": {
+                    "Service": "ec2.amazonaws.com"
+                }
+            }]
+        }
+      Policies:
+        - PolicyName: ecs-service
+          PolicyDocument: |
+            {
+                "Statement": [{
+                    "Effect": "Allow",
+                    "Action": [
+                        "ecs:CreateCluster",
+                        "ecs:DeregisterContainerInstance",
+                        "ecs:DiscoverPollEndpoint",
+                        "ecs:Poll",
+                        "ecs:RegisterContainerInstance",
+                        "ecs:StartTelemetrySession",
+                        "ecs:Submit*",
+                        "logs:CreateLogStream",
+                        "logs:PutLogEvents",
+                        "ecr:BatchCheckLayerAvailability",
+                        "ecr:BatchGetImage",
+                        "ecr:GetDownloadUrlForLayer",
+                        "ecr:GetAuthorizationToken",
+                        "ssm:DescribeAssociation",
+                        "ssm:GetDeployablePatchSnapshotForInstance",
+                        "ssm:GetDocument",
+                        "ssm:GetManifest",
+                        "ssm:GetParameters",
+                        "ssm:ListAssociations",
+                        "ssm:ListInstanceAssociations",
+                        "ssm:PutInventory",
+                        "ssm:PutComplianceItems",
+                        "ssm:PutConfigurePackageResult",
+                        "ssm:UpdateAssociationStatus",
+                        "ssm:UpdateInstanceAssociationStatus",
+                        "ssm:UpdateInstanceInformation",
+                        "ec2messages:AcknowledgeMessage",
+                        "ec2messages:DeleteMessage",
+                        "ec2messages:FailMessage",
+                        "ec2messages:GetEndpoint",
+                        "ec2messages:GetMessages",
+                        "ec2messages:SendReply",
+                        "cloudwatch:PutMetricData",
+                        "ec2:DescribeInstanceStatus",
+                        "ds:CreateComputer",
+                        "ds:DescribeDirectories",
+                        "logs:CreateLogGroup",
+                        "logs:CreateLogStream",
+                        "logs:DescribeLogGroups",
+                        "logs:DescribeLogStreams",
+                        "logs:PutLogEvents",
+                        "s3:PutObject",
+                        "s3:GetObject",
+                        "s3:AbortMultipartUpload",
+                        "s3:ListMultipartUploadParts",
+                        "s3:ListBucket",
+                        "s3:ListBucketMultipartUploads",
+                        "ec2:DescribeAddresses",
+                        "ec2:AllocateAddress",
+                        "ec2:DescribeInstances",
+                        "ec2:AssociateAddress"
+                    ],
+                    "Resource": "*"
+                }]
+            }
+
+  ECSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - !Ref ECSRole
+
+  ECSServiceAutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          Action:
+            - "sts:AssumeRole"
+          Effect: Allow
+          Principal:
+            Service:
+              - application-autoscaling.amazonaws.com
+      Path: /
+      Policies:
+        - PolicyName: ecs-service-autoscaling
+          PolicyDocument:
+            Statement:
+              Effect: Allow
+              Action:
+                - application-autoscaling:*
+                - cloudwatch:DescribeAlarms
+                - cloudwatch:PutMetricAlarm
+                - ecs:DescribeServices
+                - ecs:UpdateService
+                - ec2:DescribeAddresses
+                - ec2:AllocateAddress
+                - ec2:DescribeInstances
+                - ec2:AssociateAddress
+
+              Resource: "*"
+
+  # ECS cluster - end
+
+  # ECS service - begin
+
+  ECSService:
+    Type: AWS::ECS::Service
+    DependsOn: LoadBalancerListener
+    Properties:
+      Cluster: !Ref ECSCluster
+      Role: !Ref ServiceRole
+      DesiredCount: !Ref TaskMinCount
+      TaskDefinition: !Ref ESCTaskDefinition
+      LoadBalancers:
+        - ContainerName: Java-CircleCi
+          ContainerPort: 8080
+          TargetGroupArn: !Ref DefaultTargetGroup
+
+  ESCTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+        # Java-CircleCi container
+        - Name: Java-CircleCi
+          Cpu: 10
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref CloudFormationLogs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: ECS
+          EntryPoint: []
+          PortMappings:
+            - HostPort: 0
+              Protocol: tcp
+              ContainerPort: 8080
+          Memory: 512
+          MemoryReservation: 512
+          #VolumesFrom: []
+          Image: !Sub "${DockerImage}:${RepoTag}"
+          Essential: true
+          Hostname: Java-CircleCi
+
+  # This IAM Role grants the service access to register/unregister with the
+  # Application Load Balancer (ALB). It is based on the default documented here:
+  # http://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_IAM_role.html
+  ServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ecs-service-${AWS::StackName}
+      Path: /
+      AssumeRolePolicyDocument: |
+        {
+            "Statement": [{
+                "Effect": "Allow",
+                "Principal": { "Service": [ "ecs.amazonaws.com" ]},
+                "Action": [ "sts:AssumeRole" ]
+            }]
+        }
+      Policies:
+        - PolicyName: !Sub ecs-service-${AWS::StackName}
+          PolicyDocument:
+            {
+              "Version": "2012-10-17",
+              "Statement":
+                [
+                  {
+                    "Effect": "Allow",
+                    "Action":
+                      [
+                        "ec2:AuthorizeSecurityGroupIngress",
+                        "ec2:Describe*",
+                        "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                        "elasticloadbalancing:Describe*",
+                        "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                        "elasticloadbalancing:DeregisterTargets",
+                        "elasticloadbalancing:DescribeTargetGroups",
+                        "elasticloadbalancing:DescribeTargetHealth",
+                        "elasticloadbalancing:RegisterTargets",
+                      ],
+                    "Resource": "*",
+                  },
+                ],
+            }
+
+  ECSServiceScalableTarget:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MinCapacity: !Ref TaskMinCount
+      MaxCapacity: !Ref TaskMaxCount
+      ResourceId: !Join
+        - /
+        - - service
+          - !Ref ECSCluster
+          - !GetAtt ECSService.Name
+      RoleARN: !GetAtt ECSServiceAutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+
+  # ECS Service - end
+
+  # Logs
+
+  CloudFormationLogs:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      RetentionInDays: 7
